@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서울시 따릉이 재배치 최적화 시스템</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{
+  --red:#e03131;--yellow:#e67700;--green:#2f9e44;--blue:#1971c2;
+  --bg:#fff;--bg2:#f8f9fa;--bg3:#f1f3f5;
+  --surface:#fff;--border:#e9ecef;
+  --text:#212529;--muted:#868e96;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;overflow-x:hidden;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:9999;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:64px;background:rgba(255,255,255,0.93);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
+.nav-logo{display:flex;align-items:center;gap:10px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--green);}
+.nav-logo span{color:var(--text);}
+.nav-links{display:flex;gap:32px;}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s;}
+.nav-links a:hover{color:var(--text);}
+.nav-badge{display:flex;align-items:center;gap:7px;background:#ebfbee;border:1px solid #b2f2bb;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace;}
+.pulse{width:7px;height:7px;background:var(--green);border-radius:50%;animation:blink 1.4s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* HERO */
+#hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:120px 48px 80px;background:linear-gradient(160deg,#f8fff9 0%,#fff 50%,#f0f7ff 100%);position:relative;overflow:hidden;}
+.hero-c1{position:absolute;width:600px;height:600px;right:-100px;top:-100px;border-radius:50%;background:radial-gradient(circle,rgba(47,158,68,0.06) 0%,transparent 70%);pointer-events:none;}
+.hero-c2{position:absolute;width:400px;height:400px;left:-80px;bottom:-80px;border-radius:50%;background:radial-gradient(circle,rgba(25,113,194,0.06) 0%,transparent 70%);pointer-events:none;}
+.hero-inner{position:relative;z-index:1;max-width:1200px;margin:0 auto;width:100%;}
+.hero-eye{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:3px;color:var(--green);margin-bottom:20px;text-transform:uppercase;display:flex;align-items:center;gap:10px;}
+.hero-eye::before{content:'';width:32px;height:2px;background:var(--green);}
+.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,9vw,128px);line-height:.92;color:var(--text);margin-bottom:10px;}
+.hero-title .acc{color:var(--green);}
+.hero-sub{font-size:16px;color:var(--muted);line-height:1.8;max-width:500px;margin-bottom:52px;font-weight:300;}
+.hero-stats{display:flex;gap:0;margin-bottom:52px;border:1px solid var(--border);border-radius:16px;overflow:hidden;max-width:680px;background:var(--surface);box-shadow:0 4px 24px rgba(0,0,0,0.06);}
+.hero-stat{flex:1;padding:24px 28px;border-right:1px solid var(--border);}
+.hero-stat:last-child{border-right:none;}
+.hero-stat-v{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;line-height:1;margin-bottom:6px;}
+.hero-stat-l{font-size:11px;color:var(--muted);}
+.hero-cta{display:flex;gap:12px;}
+.btn-p{background:var(--green);color:#fff;padding:14px 28px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;transition:opacity .2s;box-shadow:0 4px 16px rgba(47,158,68,.3);}
+.btn-p:hover{opacity:.88;}
+.btn-s{border:1.5px solid var(--border);color:var(--muted);padding:14px 28px;border-radius:10px;font-size:14px;text-decoration:none;transition:all .2s;}
+.btn-s:hover{border-color:var(--text);color:var(--text);}
+
+/* SECTION BASE */
+section{padding:100px 48px;}
+.s-inner{max-width:1200px;margin:0 auto;}
+.s-label{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--green);text-transform:uppercase;margin-bottom:10px;}
+.s-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,5vw,64px);line-height:1;margin-bottom:48px;color:var(--text);}
+
+/* MAP */
+#map-section{padding:0;}
+.map-wrap{position:relative;height:80vh;min-height:600px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+#map{width:100%;height:100%;}
+.map-ov{position:absolute;top:20px;left:20px;z-index:1000;background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:12px;padding:16px 20px;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,.08);}
+.map-ov-t{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;font-family:'JetBrains Mono',monospace;}
+.map-leg{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;}
+.map-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.map-st{position:absolute;bottom:20px;right:20px;z-index:1000;background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+
+/* STATS */
+#stats-section{background:var(--bg2);}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:48px;}
+.stat-block{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 24px;position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+.stat-block::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;}
+.stat-block.t::after{background:var(--blue);}
+.stat-block.a::after{background:var(--green);}
+.stat-block.d::after{background:var(--red);}
+.stat-block.o::after{background:var(--yellow);}
+.stat-n{font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:700;line-height:1;margin-bottom:8px;}
+.blue{color:var(--blue);}.green{color:var(--green);}.red{color:var(--red);}.orange{color:var(--yellow);}
+.stat-l{font-size:13px;color:var(--muted);}
+.stat-s{font-size:11px;color:#adb5bd;margin-top:4px;}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+.chart-t{font-size:14px;font-weight:700;margin-bottom:4px;}
+.chart-s{font-size:11px;color:var(--muted);margin-bottom:20px;}
+
+/* FLOW SECTION */
+#flow-section{background:var(--bg);}
+.flow-controls{display:flex;gap:10px;margin-bottom:32px;flex-wrap:wrap;}
+.flow-btn{
+  padding:10px 24px;border-radius:10px;border:1.5px solid var(--border);
+  font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);
+  color:var(--muted);transition:all .2s;font-family:'Noto Sans KR',sans-serif;
+}
+.flow-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:0 4px 12px rgba(25,113,194,.3);}
+.flow-layout{display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;}
+.flow-map-wrap{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--border);height:460px;box-shadow:0 2px 16px rgba(0,0,0,.06);}
+#flow-map{width:100%;height:100%;}
+.flow-side{display:flex;flex-direction:column;gap:20px;}
+.flow-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;}
+.flow-card-t{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:14px;letter-spacing:.5px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;}
+.route-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.route-item:last-child{border-bottom:none;}
+.route-rank{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);min-width:20px;}
+.route-text{flex:1;font-size:12px;line-height:1.5;}
+.route-from{color:var(--blue);font-weight:600;}
+.route-to{color:var(--red);font-weight:600;}
+.route-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);}
+.flow-insight{background:linear-gradient(135deg,#e7f5ff,#f0fff4);border:1px solid #a5d8ff;border-radius:12px;padding:14px 16px;font-size:12px;line-height:1.75;color:var(--text);}
+.flow-insight b{color:var(--blue);}
+
+/* TOP15 */
+#top15-section{}
+.table-wrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:0 2px 16px rgba(0,0,0,.05);}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--bg3);}
+th{text-align:left;padding:14px 20px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);}
+td{padding:14px 20px;font-size:13px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tbody tr{transition:background .12s;cursor:pointer;}
+tbody tr:hover{background:var(--bg2);}
+.rn{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);}
+.bike-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.bike-badge.d{background:#fff5f5;color:var(--red);}
+.bike-badge.w{background:#fff9db;color:var(--yellow);}
+.bike-badge.g{background:#ebfbee;color:var(--green);}
+.rate-bar{height:4px;background:var(--bg3);border-radius:4px;overflow:hidden;width:80px;}
+.rate-fill{height:100%;border-radius:4px;}
+.utag{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;}
+.utag.h{background:#fff5f5;color:var(--red);}
+.utag.m{background:#fff9db;color:var(--yellow);}
+
+/* HANGANG */
+#hangang-section{background:var(--bg2);}
+.hg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.hg-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .2s;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+.hg-card:hover{box-shadow:0 8px 32px rgba(25,113,194,.12);transform:translateY(-3px);}
+.hg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--green));}
+.hg-icon{font-size:28px;margin-bottom:14px;}
+.hg-name{font-size:15px;font-weight:700;margin-bottom:8px;}
+.hg-desc{font-size:13px;color:var(--muted);line-height:1.65;}
+.hg-tag{display:inline-block;margin-top:14px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--blue);background:#e7f5ff;border-radius:4px;padding:3px 8px;}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify-content:space-between;align-items:center;}
+.footer-l{font-size:12px;color:var(--muted);line-height:1.9;}
+.footer-r{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-align:right;line-height:1.9;}
+
+/* POPUP */
+.leaflet-popup-content-wrapper{background:#fff!important;border:1px solid var(--border)!important;border-radius:12px!important;color:var(--text)!important;box-shadow:0 8px 32px rgba(0,0,0,.12)!important;}
+.leaflet-popup-tip{background:#fff!important;}
+.leaflet-popup-content{margin:14px 18px!important;font-family:'Noto Sans KR',sans-serif!important;}
+.pp-name{font-size:13px;font-weight:700;margin-bottom:10px;}
+.pp-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:5px;}
+.pp-row span:last-child{color:var(--text);font-weight:600;}
+.pp-bar{height:4px;background:var(--bg3);border-radius:4px;margin-top:10px;overflow:hidden;}
+.pp-fill{height:100%;border-radius:4px;}
+.pp-note{font-size:11px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+
+/* REVEAL */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .65s,transform .65s;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">🚲 <span>BIKE</span> SEOUL</div>
+  <div class="nav-links">
+    <a href="#map-section">실시간 지도</a>
+    <a href="#stats-section">통계</a>
+    <a href="#flow-section">이동 패턴</a>
+    <a href="#top15-section">재배치 TOP15</a>
+    <a href="#hangang-section">한강 명소</a>
+  </div>
+  <div class="nav-badge"><div class="pulse"></div><span id="nav-st">LIVE</span></div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-c1"></div><div class="hero-c2"></div>
+  <div class="hero-inner">
+    <div class="hero-eye">Seoul Public Bike · Smart Rebalancing System</div>
+    <div class="hero-title">BIKE SEOUL<br><span class="acc">REBALANCE</span></div>
+    <p class="hero-sub">서울시 따릉이 2,731개 대여소의 실시간 데이터를 분석하여<br>자전거 재배치 최적 루트를 자동으로 계산하는 스마트시티 시스템</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="hero-stat-v blue" id="h-total">—</div><div class="hero-stat-l">전체 대여소</div></div>
+      <div class="hero-stat"><div class="hero-stat-v green" id="h-bikes">—</div><div class="hero-stat-l">이용 가능 자전거</div></div>
+      <div class="hero-stat"><div class="hero-stat-v red" id="h-danger">—</div><div class="hero-stat-l">공급 위기 대여소</div></div>
+      <div class="hero-stat"><div class="hero-stat-v orange" id="h-eff">—</div><div class="hero-stat-l">공급 효율 지수</div></div>
+    </div>
+    <div class="hero-cta">
+      <a href="#map-section" class="btn-p">실시간 지도 보기 →</a>
+      <a href="#flow-section" class="btn-s">이동 패턴 분석</a>
+    </div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section id="map-section">
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-ov">
+      <div class="map-ov-t">대여소 상태</div>
+      <div class="map-leg"><div class="map-dot" style="background:#e03131"></div>공급 위기 (0~4대)</div>
+      <div class="map-leg"><div class="map-dot" style="background:#e67700"></div>보통 (5~9대)</div>
+      <div class="map-leg"><div class="map-dot" style="background:#2f9e44"></div>여유 (10대+)</div>
+    </div>
+    <div class="map-st" id="map-st">데이터 로딩 중...</div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section id="stats-section">
+  <div class="s-inner">
+    <div class="s-label reveal">실시간 통계</div>
+    <div class="s-title reveal">현황 분석</div>
+    <div class="stats-grid reveal">
+      <div class="stat-block t"><div class="stat-n blue" id="s-total">—</div><div class="stat-l">전체 대여소</div><div class="stat-s">서울시 전체</div></div>
+      <div class="stat-block a"><div class="stat-n green" id="s-bikes">—</div><div class="stat-l">이용 가능 자전거</div><div class="stat-s">현재 기준</div></div>
+      <div class="stat-block d"><div class="stat-n red" id="s-danger">—</div><div class="stat-l">공급 위기 대여소</div><div class="stat-s">5대 미만</div></div>
+      <div class="stat-block o"><div class="stat-n orange" id="s-ok">—</div><div class="stat-l">여유 대여소</div><div class="stat-s">10대 이상</div></div>
+    </div>
+    <div class="charts-grid reveal">
+      <div class="chart-card"><div class="chart-t">공급 상태 분포</div><div class="chart-s">전체 대여소 비율</div><canvas id="chart-donut" height="200"></canvas></div>
+      <div class="chart-card"><div class="chart-t">거치율 구간별 대여소 수</div><div class="chart-s">0%~100% 구간별 분포</div><canvas id="chart-bar" height="200"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- FLOW SECTION -->
+<section id="flow-section">
+  <div class="s-inner">
+    <div class="s-label reveal">시간대별 이동 패턴</div>
+    <div class="s-title reveal">언제, 어디서 어디로 <span style="color:var(--blue)">이동하나</span></div>
+    <div class="flow-controls reveal">
+      <button class="flow-btn active" data-t="commute">🌅 출근 (07~09시)</button>
+      <button class="flow-btn" data-t="lunch">☀️ 낮 (12~14시)</button>
+      <button class="flow-btn" data-t="evening">🌆 퇴근 (18~20시)</button>
+      <button class="flow-btn" data-t="weekend">🏞 주말 한강 (10~18시)</button>
+    </div>
+    <div class="flow-layout reveal">
+      <div class="flow-map-wrap"><div id="flow-map"></div></div>
+      <div class="flow-side">
+        <div class="flow-card">
+          <div class="flow-card-t">주요 이동 루트 TOP 5</div>
+          <div id="flow-routes" style="max-height:300px;overflow-y:auto;"></div>
+        </div>
+        <div class="flow-card">
+          <div class="flow-card-t">24시간 이용량 패턴</div>
+          <canvas id="flow-chart" height="140"></canvas>
+        </div>
+        <div id="flow-insight" class="flow-insight"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TOP15 -->
+<section id="top15-section">
+  <div class="s-inner">
+    <div class="s-label reveal">긴급 재배치</div>
+    <div class="s-title reveal">자전거 부족 대여소 <span style="color:var(--red)">TOP 15</span></div>
+    <div class="table-wrap reveal">
+      <table>
+        <thead><tr><th style="width:50px">순위</th><th>대여소명</th><th>현재 자전거</th><th>전체 거치대</th><th>거치율</th><th>긴급도</th></tr></thead>
+        <tbody id="top15-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- HANGANG -->
+<section id="hangang-section">
+  <div class="s-inner">
+    <div class="s-label reveal">한강 라이딩</div>
+    <div class="s-title reveal">자전거 타기 좋은 <span style="color:var(--blue)">명소</span></div>
+    <div class="hg-grid reveal">
+      <div class="hg-card"><div class="hg-icon">🌸</div><div class="hg-name">여의도 한강공원</div><div class="hg-desc">자전거 대여소 5개소 밀집. 한강 라이딩의 최적 출발점. 봄 벚꽃 시즌 최고 명소.</div><div class="hg-tag">대여소 밀집지역</div></div>
+      <div class="hg-card"><div class="hg-icon">🏄</div><div class="hg-name">뚝섬 한강공원</div><div class="hg-desc">자전거 전용도로 6km. 물놀이장과 수변 카페가 인접해 가족 라이딩 코스로 인기.</div><div class="hg-tag">자전거 전용도로</div></div>
+      <div class="hg-card"><div class="hg-icon">🌈</div><div class="hg-name">반포 한강공원</div><div class="hg-desc">달빛무지개분수·세빛섬 인근. 야간 라이딩 명소로 야경이 아름다운 코스.</div><div class="hg-tag">야간 라이딩 추천</div></div>
+      <div class="hg-card"><div class="hg-icon">🎡</div><div class="hg-name">잠실 한강공원</div><div class="hg-desc">롯데월드 타워 전망 포인트. 자전거 하이킹 코스로 한강 동쪽 라이딩 거점.</div><div class="hg-tag">전망 포인트</div></div>
+      <div class="hg-card"><div class="hg-icon">🌅</div><div class="hg-name">망원 한강공원</div><div class="hg-desc">한강 노을 명소. 홍대·합정 따릉이 대여소와 연결되는 서쪽 라이딩 코스.</div><div class="hg-tag">노을 명소</div></div>
+      <div class="hg-card"><div class="hg-icon">🏕</div><div class="hg-name">난지 한강공원</div><div class="hg-desc">캠핑장 인접. 한강 자전거길 서쪽 구간 시작점. 월드컵공원과 연결 가능.</div><div class="hg-tag">캠핑장 인접</div></div>
+      <div class="hg-card"><div class="hg-icon">🌊</div><div class="hg-name">광나루 한강공원</div><div class="hg-desc">광진교 인근. 한강 동쪽 라이딩 출발점. 아차산과 연결되는 자연 코스.</div><div class="hg-tag">한강 동쪽 출발점</div></div>
+      <div class="hg-card"><div class="hg-icon">🏝</div><div class="hg-name">양화 한강공원</div><div class="hg-desc">선유도공원 연결 코스. 한강 서쪽 핵심 라이딩 구간. 당산역 따릉이 연계.</div><div class="hg-tag">선유도공원 연결</div></div>
+      <div class="hg-card"><div class="hg-icon">🗼</div><div class="hg-name">이촌 한강공원</div><div class="hg-desc">용산가족공원 인접. 한강철교 조망 포인트. 이촌역 따릉이 대여소 밀집.</div><div class="hg-tag">철교 조망 포인트</div></div>
+      <div class="hg-card"><div class="hg-icon">🌿</div><div class="hg-name">잠원 한강공원</div><div class="hg-desc">신사동·압구정 인근. 강남 따릉이 라이딩 출발점. 고수부지 구간 접근 용이.</div><div class="hg-tag">강남 출발점</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-l">🚲 서울시 따릉이 재배치 최적화 시스템<br>데이터 출처: 서울 열린데이터광장 따릉이 실시간 대여정보 API · 서울시 실시간 도시데이터 API</div>
+  <div class="footer-r">마지막 갱신: <span id="footer-t">—</span><br>Seoul Smart City · Digital Twin</div>
+</footer>
+
+<script>
+/* ══ 실시간 지도 ══ */
+const API_KEY='6745545472786f673339616c6e7864';
+let STATIONS=[],markers=[];
+const map=L.map('map',{center:[37.54,126.94],zoom:12,zoomControl:true,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+function gc(p){return p<=4?'#e03131':p<=9?'#e67700':'#2f9e44';}
+function cn(n){return n.replace(/^\d+\.?\s*/,'').trim();}
+function renderMap(st){
+  markers.forEach(m=>m.remove());markers=[];
+  st.forEach(s=>{
+    if(!s.lat||!s.lng)return;
+    const c=gc(s.p),pct=s.r>0?Math.round(s.p/s.r*100):0,nm=cn(s.n);
+    let note=s.p<5?`<div class="pp-note" style="color:#e03131">↑ 재배치 필요</div>`:s.p>=20?`<div class="pp-note" style="color:#2f9e44">↓ 회수 가능</div>`:'';
+    const m=L.circleMarker([s.lat,s.lng],{radius:s.p<=4?7:s.p<=9?6:5,fillColor:c,color:'rgba(0,0,0,.2)',weight:1,fillOpacity:.85}).addTo(map);
+    m.bindPopup(`<div class="pp-name">🚲 ${nm}</div><div class="pp-row"><span>이용 가능</span><span style="color:${c}">${s.p}대</span></div><div class="pp-row"><span>전체 거치대</span><span>${s.r}개</span></div><div class="pp-row"><span>거치율</span><span>${pct}%</span></div><div class="pp-bar"><div class="pp-fill" style="width:${Math.min(pct,100)}%;background:${c}"></div></div>${note}`);
+    s._m=m;markers.push(m);
+  });
+}
+let cDonut,cBar;
+function updateStats(st){
+  const total=st.length,bikes=st.reduce((a,s)=>a+s.p,0),danger=st.filter(s=>s.p<5).length,ok=st.filter(s=>s.p>=10).length;
+  const avgR=st.reduce((a,s)=>a+(s.r>0?s.p/s.r:0),0)/total;
+  const vari=st.reduce((a,s)=>a+(s.r>0?Math.pow(s.p/s.r-avgR,2):0),0)/total;
+  const eff=Math.max(0,Math.round(100-vari*300));
+  const fmt=n=>n.toLocaleString();
+  document.getElementById('h-total').textContent=fmt(total);
+  document.getElementById('h-bikes').textContent=fmt(bikes);
+  document.getElementById('h-danger').textContent=fmt(danger);
+  document.getElementById('h-eff').textContent=eff+'pt';
+  document.getElementById('s-total').textContent=fmt(total);
+  document.getElementById('s-bikes').textContent=fmt(bikes);
+  document.getElementById('s-danger').textContent=fmt(danger);
+  document.getElementById('s-ok').textContent=fmt(ok);
+  // TOP15
+  const srt=[...st].sort((a,b)=>a.p-b.p).slice(0,15);
+  document.getElementById('top15-tbody').innerHTML=srt.map((s,i)=>{
+    const nm=cn(s.n),pct=s.r>0?Math.round(s.p/s.r*100):0;
+    const bc=s.p<5?'d':s.p<10?'w':'g',fc=gc(s.p);
+    const urg=s.p<3?'<span class="utag h">긴급</span>':s.p<5?'<span class="utag m">주의</span>':'';
+    return `<tr onclick="flyTo(${s.lat},${s.lng})"><td class="rn">${String(i+1).padStart(2,'0')}</td><td style="font-weight:500">${nm}</td><td><span class="bike-badge ${bc}">${s.p}대</span></td><td style="color:var(--muted)">${s.r}개</td><td><div style="display:flex;align-items:center;gap:8px"><div class="rate-bar"><div class="rate-fill" style="width:${pct}%;background:${fc}"></div></div><span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">${pct}%</span></div></td><td>${urg}</td></tr>`;
+  }).join('');
+  // Charts
+  const warn=total-danger-ok;
+  const c1=document.getElementById('chart-donut').getContext('2d');
+  const c2=document.getElementById('chart-bar').getContext('2d');
+  if(cDonut)cDonut.destroy();if(cBar)cBar.destroy();
+  cDonut=new Chart(c1,{type:'doughnut',data:{labels:['공급 위기','보통','여유'],datasets:[{data:[danger,warn,ok],backgroundColor:['#e03131','#e67700','#2f9e44'],borderWidth:2,borderColor:'#fff',hoverOffset:4}]},options:{cutout:'72%',plugins:{legend:{labels:{color:'#868e96',font:{family:'Noto Sans KR',size:12}}}}}});
+  const bkts=new Array(10).fill(0);
+  st.forEach(s=>{if(s.r>0){const idx=Math.min(9,Math.floor(s.p/s.r*10));bkts[idx]++;}});
+  cBar=new Chart(c2,{type:'bar',data:{labels:['0~10%','10~20%','20~30%','30~40%','40~50%','50~60%','60~70%','70~80%','80~90%','90~100%'],datasets:[{data:bkts,backgroundColor:bkts.map((_,i)=>i<2?'#e03131':i<4?'#e67700':'#2f9e44'),borderRadius:5,borderWidth:0}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#868e96',font:{size:10}},grid:{color:'#f1f3f5'}},y:{ticks:{color:'#868e96',font:{size:10}},grid:{color:'#f1f3f5'}}}}});
+}
+function flyTo(lat,lng){document.getElementById('map-section').scrollIntoView({behavior:'smooth'});setTimeout(()=>map.flyTo([lat,lng],16,{duration:1}),600);}
+const PROXIES=[
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+];
+async function fetchOne(apiUrl){
+  // 직접 호출 시도 (같은 도메인이면 바로 작동)
+  try{
+    const j=await fetch(apiUrl).then(r=>r.json());
+    if(j.rentBikeStatus?.row) return j.rentBikeStatus.row;
+  }catch(e){}
+  // 프록시 순서대로 시도
+  for(const pFn of PROXIES){
+    try{
+      const j=await fetch(pFn(apiUrl),{signal:AbortSignal.timeout(8000)}).then(r=>r.json());
+      if(j.rentBikeStatus?.row) return j.rentBikeStatus.row;
+    }catch(e){}
+  }
+  return [];
+}
+async function fetchData(){
+  const toS=r=>({n:r.stationName,r:parseInt(r.rackTotCnt),p:parseInt(r.parkingBikeTotCnt),lat:parseFloat(r.stationLatitude),lng:parseFloat(r.stationLongitude)});
+  const st=document.getElementById('map-st');
+  st.textContent='🔄 데이터 불러오는 중...';
+  try{
+    let all=[];
+    for(const[s,e]of[[1,1000],[1001,2000],[2001,3000]]){
+      const rows=await fetchOne(`http://openapi.seoul.go.kr:8088/${API_KEY}/json/bikeList/${s}/${e}/`);
+      all=all.concat(rows.map(toS).filter(s=>s.lat&&s.lng));
+    }
+    if(all.length>0){
+      STATIONS=all;renderMap(STATIONS);updateStats(STATIONS);
+      const t=new Date().toLocaleTimeString('ko-KR');
+      st.textContent=`LIVE · ${t} · ${STATIONS.length}개소`;
+      document.getElementById('footer-t').textContent=t;
+      // 히어로 숫자 업데이트
+      ['h-total','h-bikes','h-danger','h-eff'].forEach(id=>{
+        const el=document.getElementById(id);
+        if(el&&el.textContent==='—') el.textContent=document.getElementById(id.replace('h-','s-'))?.textContent||'—';
+      });
+    } else {
+      st.innerHTML='⚠ 실시간 연결 불가 — <a href="http://openapi.seoul.go.kr:8088/${API_KEY}/json/bikeList/1/10/" target="_blank" style="color:var(--blue)">API 탭</a>에서 수동 로드 필요';
+    }
+  }catch(e){
+    st.textContent='⚠ 데이터 로드 실패 · 잠시 후 재시도';
+  }
+}
+fetchData();setInterval(fetchData,300000);
+
+/* ══ 시간대별 이동 패턴 ══ */
+const flowMap=L.map('flow-map',{center:[37.54,126.99],zoom:12,zoomControl:true,attributionControl:false,dragging:true,scrollWheelZoom:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(flowMap);
+
+// 주요 거점 (인접 대여소 단위 — 단거리 이동 분석용)
+const HUBS={
+  // 여의도 권역
+  여의도역:   {lat:37.5219,lng:126.9245,type:'업무'},
+  여의나루역: {lat:37.5271,lng:126.9325,type:'업무'},
+  국회의사당: {lat:37.5283,lng:126.9176,type:'업무'},
+  샛강역:     {lat:37.5176,lng:126.9213,type:'주거'},
+  여의도한강: {lat:37.5283,lng:126.9338,type:'한강'},
+  // 강남 권역
+  강남역:     {lat:37.4979,lng:127.0276,type:'업무'},
+  역삼역:     {lat:37.5006,lng:127.0364,type:'업무'},
+  선릉역:     {lat:37.5045,lng:127.0492,type:'업무'},
+  교대역:     {lat:37.4935,lng:127.0145,type:'업무'},
+  신논현역:   {lat:37.5045,lng:127.0250,type:'업무'},
+  // 마포·홍대 권역
+  홍대입구역: {lat:37.5572,lng:126.9246,type:'대학'},
+  합정역:     {lat:37.5495,lng:126.9135,type:'대학'},
+  망원역:     {lat:37.5560,lng:126.9105,type:'주거'},
+  상수역:     {lat:37.5478,lng:126.9226,type:'대학'},
+  망원한강:   {lat:37.5555,lng:126.8973,type:'한강'},
+  // 광화문·종로·중구 권역 (서울 중심)
+  광화문:     {lat:37.5700,lng:126.9769,type:'업무'},
+  종로3가:    {lat:37.5704,lng:126.9920,type:'업무'},
+  시청역:     {lat:37.5658,lng:126.9770,type:'업무'},
+  을지로입구: {lat:37.5660,lng:126.9826,type:'업무'},
+  동대문역:   {lat:37.5713,lng:127.0094,type:'업무'},
+  서울역:     {lat:37.5547,lng:126.9706,type:'업무'},
+  명동:       {lat:37.5636,lng:126.9869,type:'업무'},
+  // 용산 권역
+  삼각지역:   {lat:37.5347,lng:126.9733,type:'주거'},
+  이태원역:   {lat:37.5343,lng:126.9944,type:'업무'},
+  용산역:     {lat:37.5298,lng:126.9646,type:'업무'},
+  이촌한강:   {lat:37.5172,lng:126.9682,type:'한강'},
+  // 성수·건대 권역
+  건대입구역: {lat:37.5403,lng:127.0698,type:'대학'},
+  성수역:     {lat:37.5446,lng:127.0559,type:'업무'},
+  뚝섬역:     {lat:37.5471,lng:127.0473,type:'주거'},
+  서울숲:     {lat:37.5443,lng:127.0374,type:'한강'},
+  뚝섬한강:   {lat:37.5311,lng:127.0668,type:'한강'},
+  // 왕십리·청계 권역
+  왕십리역:   {lat:37.5611,lng:127.0375,type:'주거'},
+  상왕십리역: {lat:37.5644,lng:127.0292,type:'주거'},
+  // 잠실 권역
+  잠실역:     {lat:37.5131,lng:127.1001,type:'업무'},
+  잠실나루역: {lat:37.5208,lng:127.1037,type:'주거'},
+  잠실한강:   {lat:37.5180,lng:127.0820,type:'한강'},
+};
+
+const FLOW_DATA={
+  commute:{
+    title:'출근 시간대 (07~09시)',
+    routes:[
+      {from:'여의나루역', to:'여의도역',  vol:210, label:'여의나루역 → 여의도역'},
+      {from:'합정역',     to:'홍대입구역',vol:180, label:'합정역 → 홍대입구역'},
+      {from:'잠실나루역', to:'잠실역',    vol:160, label:'잠실나루역 → 잠실역'},
+      {from:'뚝섬역',     to:'성수역',    vol:150, label:'뚝섬역 → 성수역'},
+      {from:'역삼역',     to:'강남역',    vol:145, label:'역삼역 → 강남역'},
+      {from:'시청역',     to:'광화문',    vol:140, label:'시청역 → 광화문'},
+      {from:'을지로입구', to:'종로3가',   vol:130, label:'을지로입구 → 종로3가'},
+      {from:'삼각지역',   to:'용산역',    vol:120, label:'삼각지역 → 용산역'},
+      {from:'상왕십리역', to:'왕십리역',  vol:115, label:'상왕십리역 → 왕십리역'},
+      {from:'샛강역',     to:'여의도역',  vol:110, label:'샛강역 → 여의도역'},
+    ],
+    hourly:[20,15,12,10,18,45,320,580,490,210,140,160,180,200,190,210,240,380,520,460,320,210,130,60],
+    insight:'<b>출근 시간대</b>는 지하철역에서 인근 업무지 대여소로 자전거가 이동합니다. 모두 <b>1km 내외 단거리</b>이며, 역 주변 대여소가 빠르게 비워지므로 <b>새벽 시간 역 주변 집중 배치</b>가 효과적입니다.'
+  },
+  lunch:{
+    title:'점심 시간대 (12~14시)',
+    routes:[
+      {from:'광화문',     to:'종로3가',   vol:150, label:'광화문 → 종로3가'},
+      {from:'시청역',     to:'명동',      vol:135, label:'시청역 → 명동'},
+      {from:'강남역',     to:'역삼역',    vol:130, label:'강남역 → 역삼역'},
+      {from:'신논현역',   to:'강남역',    vol:120, label:'신논현역 → 강남역'},
+      {from:'여의도역',   to:'여의도한강',vol:115, label:'여의도역 → 여의도한강'},
+      {from:'성수역',     to:'서울숲',    vol:110, label:'성수역 → 서울숲'},
+      {from:'을지로입구', to:'명동',      vol:105, label:'을지로입구 → 명동'},
+      {from:'이태원역',   to:'삼각지역',  vol:95,  label:'이태원역 → 삼각지역'},
+      {from:'선릉역',     to:'역삼역',    vol:90,  label:'선릉역 → 역삼역'},
+    ],
+    hourly:[20,15,12,10,18,45,120,200,180,160,160,180,320,410,360,280,260,320,400,380,260,180,110,50],
+    insight:'<b>점심 시간대</b>는 업무지구 내 식사·산책을 위한 <b>초단거리 이동</b>(0.5~1.5km)이 주를 이룹니다. 인근 한강공원·공원으로의 짧은 나들이도 늘어나므로 <b>업무지구 내 거치대 순환</b>이 중요합니다.'
+  },
+  evening:{
+    title:'퇴근 시간대 (18~20시)',
+    routes:[
+      {from:'여의도역',   to:'여의나루역',vol:230, label:'여의도역 → 여의나루역'},
+      {from:'홍대입구역', to:'합정역',    vol:190, label:'홍대입구역 → 합정역'},
+      {from:'잠실역',     to:'잠실나루역',vol:175, label:'잠실역 → 잠실나루역'},
+      {from:'성수역',     to:'뚝섬역',    vol:160, label:'성수역 → 뚝섬역'},
+      {from:'강남역',     to:'선릉역',    vol:155, label:'강남역 → 선릉역'},
+      {from:'광화문',     to:'시청역',    vol:145, label:'광화문 → 시청역'},
+      {from:'종로3가',    to:'동대문역',  vol:135, label:'종로3가 → 동대문역'},
+      {from:'용산역',     to:'삼각지역',  vol:125, label:'용산역 → 삼각지역'},
+      {from:'왕십리역',   to:'상왕십리역',vol:115, label:'왕십리역 → 상왕십리역'},
+      {from:'강남역',     to:'교대역',    vol:110, label:'강남역 → 교대역'},
+    ],
+    hourly:[20,15,12,10,18,45,180,320,280,200,170,180,250,280,270,280,340,480,560,510,340,220,130,60],
+    insight:'<b>퇴근 시간대</b>는 출근의 역방향으로 업무지에서 주거지·지하철역으로 자전거가 돌아갑니다. 업무지 대여소에 <b>자전거가 적체</b>되므로 저녁 회수, 주거지 보충이 반복적으로 필요합니다.'
+  },
+  weekend:{
+    title:'주말 한강 (10~18시)',
+    routes:[
+      {from:'망원역',     to:'망원한강',  vol:280, label:'망원역 → 망원한강'},
+      {from:'여의도역',   to:'여의도한강',vol:260, label:'여의도역 → 여의도한강'},
+      {from:'성수역',     to:'뚝섬한강',  vol:230, label:'성수역 → 뚝섬한강'},
+      {from:'합정역',     to:'망원한강',  vol:205, label:'합정역 → 망원한강'},
+      {from:'서울숲',     to:'뚝섬한강',  vol:185, label:'서울숲 → 뚝섬한강'},
+      {from:'잠실나루역', to:'잠실한강',  vol:170, label:'잠실나루역 → 잠실한강'},
+      {from:'용산역',     to:'이촌한강',  vol:155, label:'용산역 → 이촌한강'},
+      {from:'상수역',     to:'망원한강',  vol:140, label:'상수역 → 망원한강'},
+      {from:'샛강역',     to:'여의도한강',vol:130, label:'샛강역 → 여의도한강'},
+    ],
+    hourly:[10,8,8,8,12,30,80,140,220,380,460,480,490,500,480,460,420,350,260,180,120,80,50,20],
+    insight:'<b>주말 한강 시간대</b>는 한강공원 인접 지하철역에서 공원으로의 <b>짧은 진입 이동</b>(1km 내외)이 집중됩니다. 한강 대여소가 빠르게 포화되므로 <b>주말 아침 한강 집중 배치 + 오후 회수</b>가 핵심입니다.'
+  }
+};
+
+const typeColor={주거:'#2f9e44',업무:'#e03131',대학:'#1971c2',한강:'#0099cc'};
+let flowLayers=[],flowChartInst=null,activeType='commute';
+
+function renderFlow(type){
+  activeType=type;
+  flowLayers.forEach(l=>{try{l.remove();}catch(e){}});flowLayers=[];
+  const d=FLOW_DATA[type];
+
+  // 허브 마커
+  Object.entries(HUBS).forEach(([name,h])=>{
+    const col=typeColor[h.type]||'#888';
+    const icon=L.divIcon({className:'',html:`<div style="width:12px;height:12px;background:${col};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>`,iconSize:[12,12],iconAnchor:[6,6]});
+    const m=L.marker([h.lat,h.lng],{icon,zIndexOffset:100}).addTo(flowMap);
+    m.bindTooltip(name,{direction:'top',offset:[0,-8]});
+    flowLayers.push(m);
+  });
+
+  // 이동 루트
+  const maxVol=Math.max(...d.routes.map(r=>r.vol));
+  d.routes.forEach((r,i)=>{
+    const from=HUBS[r.from],to=HUBS[r.to];
+    if(!from||!to)return;
+    const w=1+Math.round((r.vol/maxVol)*5);
+    const opacity=0.4+((r.vol/maxVol)*0.5);
+    const colors=['#1971c2','#2f9e44','#e03131','#e67700','#7950f2'];
+    const line=L.polyline([[from.lat,from.lng],[to.lat,to.lng]],{
+      color:colors[i%colors.length],weight:w+1,opacity,
+    }).addTo(flowMap);
+    line.bindPopup(`<div style="font-size:13px;font-weight:700;margin-bottom:6px">🚲 ${r.label}</div><div style="font-size:12px;color:#868e96">예상 이동량: <b style="color:#212529">${r.vol}건/시간</b></div>`);
+    // 화살표 마커 (중간 지점)
+    const mid=[(from.lat+to.lat)/2,(from.lng+to.lng)/2];
+    const arrIcon=L.divIcon({className:'',html:`<div style="background:${colors[i%colors.length]};color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.2)">${r.vol}건</div>`,iconSize:[50,20],iconAnchor:[25,10]});
+    const arrM=L.marker(mid,{icon:arrIcon,zIndexOffset:200}).addTo(flowMap);
+    arrM.bindPopup(`<div style="font-size:13px;font-weight:700;margin-bottom:6px">🚲 ${r.label}</div><div style="font-size:12px;color:#868e96">예상 이동량: <b style="color:#212529">${r.vol}건/시간</b></div>`);
+    flowLayers.push(line,arrM);
+  });
+
+  // 출발지·도착지 강조
+  d.routes.forEach(r=>{
+    const from=HUBS[r.from],to=HUBS[r.to];
+    if(!from||!to)return;
+    const fIcon=L.divIcon({className:'',html:`<div style="width:16px;height:16px;background:#1971c2;border:2px solid white;border-radius:50%;box-shadow:0 0 8px rgba(25,113,194,.6)"></div>`,iconSize:[16,16],iconAnchor:[8,8]});
+    const tIcon=L.divIcon({className:'',html:`<div style="width:16px;height:16px;background:#e03131;border:2px solid white;border-radius:50%;box-shadow:0 0 8px rgba(224,49,49,.6)"></div>`,iconSize:[16,16],iconAnchor:[8,8]});
+    const mf=L.marker([from.lat,from.lng],{icon:fIcon,zIndexOffset:300}).addTo(flowMap);
+    const mt=L.marker([to.lat,to.lng],{icon:tIcon,zIndexOffset:300}).addTo(flowMap);
+    mf.bindTooltip(r.from+' (출발)',{direction:'top',offset:[0,-10]});
+    mt.bindTooltip(r.to+' (도착)',{direction:'top',offset:[0,-10]});
+    flowLayers.push(mf,mt);
+  });
+
+  // 루트 목록
+  document.getElementById('flow-routes').innerHTML=d.routes.map((r,i)=>
+    `<div class="route-item">
+      <div class="route-rank">${String(i+1).padStart(2,'0')}</div>
+      <div class="route-text"><span class="route-from">📤 ${r.from}</span> → <span class="route-to">📥 ${r.to}</span></div>
+      <div class="route-count">${r.vol}건</div>
+    </div>`
+  ).join('');
+
+  // 인사이트
+  document.getElementById('flow-insight').innerHTML=d.insight;
+
+  // 24시간 차트
+  const cCtx=document.getElementById('flow-chart').getContext('2d');
+  if(flowChartInst)flowChartInst.destroy();
+  const hours=Array.from({length:24},(_,i)=>i+'시');
+  const peaks=[6,7,8,17,18,19];
+  flowChartInst=new Chart(cCtx,{
+    type:'bar',
+    data:{
+      labels:hours,
+      datasets:[{
+        data:d.hourly,
+        backgroundColor:d.hourly.map((_,i)=>peaks.includes(i)?'#e03131':'#adb5bd'),
+        borderRadius:3,borderWidth:0
+      }]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#868e96',font:{size:9},maxRotation:0},grid:{display:false}},
+        y:{ticks:{color:'#868e96',font:{size:9}},grid:{color:'#f1f3f5'}}
+      }
+    }
+  });
+
+  setTimeout(()=>{
+    flowMap.invalidateSize();
+    // 선택된 루트들이 화면에 꽉 차도록 자동 조정
+    const pts=[];
+    d.routes.forEach(r=>{ const f=HUBS[r.from],t=HUBS[r.to]; if(f)pts.push([f.lat,f.lng]); if(t)pts.push([t.lat,t.lng]); });
+    if(pts.length){ flowMap.fitBounds(pts,{padding:[50,50],maxZoom:14}); }
+  },120);
+}
+
+// 버튼 이벤트
+document.querySelectorAll('.flow-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.flow-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderFlow(btn.dataset.t);
+  });
+});
+renderFlow('commute');
+
+// Scroll reveal
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')});},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+// Hangang click
+const HC=[[37.5283,126.9338],[37.5311,127.0668],[37.5071,126.9989],[37.5130,127.0869],[37.5555,126.8973],[37.5691,126.8947],[37.5477,127.1073],[37.5438,126.9033],[37.5172,126.9682],[37.5137,127.0096]];
+document.querySelectorAll('.hg-card').forEach((card,i)=>{
+  card.addEventListener('click',()=>{document.getElementById('map-section').scrollIntoView({behavior:'smooth'});setTimeout(()=>map.flyTo(HC[i],15,{duration:1}),600);});
+});
+</script>
+</body>
+</html>
